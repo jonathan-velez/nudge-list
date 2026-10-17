@@ -1,14 +1,13 @@
 # Nudge List
 
-A personal monitoring list powered by changedetection.io. It monitors **DSRT's
-published public reef pricing** every three hours at
-[localhost:5050](http://localhost:5050), with an optional catalog watch and a
-daily upcoming-availability watch. Small internal Python helpers store session
-price baselines and combine monthly calendars for availability.
+A personal monitoring list powered by changedetection.io at
+[localhost:5050](http://localhost:5050). It monitors DSRT's published public reef
+pricing every three hours, DSRT upcoming availability daily, and LoveMachine
+FM inventory every ten minutes, with an optional paused catalog watch. Small
+internal Python helpers store comparison baselines and combine calendars.
 
-The monitor runs locally in Docker. Pricing and daily availability notifications
-use the configured ntfy destination; the optional catalog remains paused and
-muted.
+The monitor runs locally in Docker. All active watches use the configured ntfy
+destination; the optional catalog remains paused.
 
 ## Start / stop
 
@@ -113,8 +112,8 @@ when operating this installation.
 ## Settings and history
 
 To configure notifications, edit ignored `.local/watch.json` and rerun
-`bash scripts/setup-local.sh`. This applies its notification destination to both
-pricing and availability watches. The current feed and message are taken from
+`bash scripts/setup-local.sh`. This applies its notification destination to pricing,
+availability, and LoveMachine inventory watches. The current feed and message are taken from
 `config/watch.json`; local notification destinations and polling interval are retained.
 The setup script finds the exact title, creates or updates one watch, and refuses
 ambiguous duplicate titles. Keep titles stable to retain identity/history.
@@ -147,8 +146,8 @@ cp config/watch.json .local/watch.json
 
 The prepared message reports existing-session price changes or new sessions below
 their matching slot reference, and links to the booking calendar. It includes the
-latest pricing report rather than calendar schedule diffs. The configured ntfy
-destination is used by both local active watches and kept out of version control.
+latest pricing report rather than calendar schedule diffs. The configured ntfy destination is used by all local
+active watches and kept out of version control.
 
 ## Optional catalog
 
@@ -178,7 +177,7 @@ bash scripts/setup-local.sh
 python3 tests/test_availability.py
 ```
 
-Open the watch's Preview for the report or Diff/history for saved changes. It fetches the current month and the next 12 months, including empty intervening months, deduplicates overlapping calendars by session ID, and tracks all public, non-private reef and bay sessions. If the final month is populated it extends the search, up to 24 months ahead, and flags that limit if still populated. This is bounded discovery, not a promise of unlimited future coverage.
+Open the watch's Preview for the most recent actual change report or Diff/history for saved changes. It fetches the current month and the next 12 months, including empty intervening months, deduplicates overlapping calendars by session ID, and tracks all public, non-private reef and bay sessions. If the final month is populated it extends the search, up to 24 months ahead, and flags that limit if still populated. This is bounded discovery, not a promise of unlimited future coverage.
 
 The report lists availability decreases/increases, new and removed sessions, expired sessions, and the full upcoming inventory. Only clean reef availability decreases are totaled as **possible net bookings**. Capacity, cart, blocking, schedule, and shared bay inventory changes are excluded from those totals. Expired or missing sessions are never interpreted as bookings. The public API cannot establish gross sales or attendance, and bookings/cancellations between snapshots can offset each other.
 
@@ -191,7 +190,16 @@ has no host port and is reachable only on the Compose network at
 `http://availability:8080/report`. It reuses the already-pinned image's Python
 runtime, with no additional packages. Scheduling belongs to CD.
 
-Daily reports are stored even on no-change days. Notifications use the same ntfy
+Alert detection compares normalized upcoming inventory, excluding sessions that
+have simply expired. Timestamps, changing daily totals, ordering, and clearing
+the previous day's changes cannot trigger alerts. The HTTP feed retains the
+last actual change report across unchanged days and restarts; its observation
+time is the time of that change. Real availability, capacity, cart, status,
+schedule, and public-session additions/removals still trigger changes.
+Each saved JSON includes a fresh `daily_report`, current `sessions`, and the
+retained alert `report`, even on no-change days. To test the HTTP/history pipeline
+without live delivery, run `bash tests/test-integration.sh tests/availability_integration.py`.
+Notifications use the same ntfy
 destination as pricing. Use `bash scripts/setup-local.sh` to apply this
 configuration; the tracked availability JSON remains a muted template.
 
@@ -199,16 +207,34 @@ configuration; the tracked availability JSON remains a muted template.
 
 ```sh
 python3 tests/test_pricing.py -v
+python3 tests/test_inventory.py -v
 ./tests/test-normalization.sh
 ./tests/test-integration.sh
 docker compose ps
 docker compose logs --tail=80 changedetection
 ```
 
-Integration tests run the same pinned image in a disposable, network-isolated container, with synthetic JSON served on its internal loopback interface. Test state is tmpfs, the repository is mounted read-only, and no production history is modified. The tests cover both legacy jq normalization and the persistent pricing helper through CD's actual fetcher and history engine. Synthetic price tests never modify production state or send notifications.
+Integration tests run the same pinned image in a disposable, network-isolated container, with synthetic JSON served on its internal loopback interface. Test state is tmpfs, the repository is mounted read-only, and no production history is modified. The tests cover both legacy jq normalization and the persistent pricing and inventory helpers through CD's actual fetcher and history engine. Synthetic price tests never modify production state or send notifications.
 
 On API/network errors, inspect the watch's error and press Recheck after recovery. Do not clear history to hide failures. Check Docker is awake, internet/DNS works, and DSRT still exposes the expected schema. A sudden no-public-reef error may mean the calendar has no published sessions or the API changed. Do not relax validation without inspecting the response.
 
 If setup returns an HTTP validation error, its body identifies the unsupported field. If connection is refused, wait for startup and confirm port 5050 is free. If the API returns 403, check the API key/security setting. Rerun setup after changing filters/settings; do not edit the application code or its datastore files.
 
 To upgrade, update the image digest in both Compose files, run the tests, and recreate production with `docker compose up -d`. Back up the named volume before upgrades. See [validation results](docs/validation.md).
+
+## LoveMachine FM inventory
+
+**LoveMachine FM | 6'4 & 6'6 | Inventory** checks Shopify's public FM collection
+JSON every **10 minutes**, discovers new products automatically, and reports
+only newly available matching listings or restocks. Sold-outs and metadata edits
+are silent. It shares the existing pricing helper container and storage, with
+no new service or dependency. Notifications reuse the existing channels.
+
+```sh
+docker compose restart pricing
+bash scripts/setup-lovemachine.sh
+python3 tests/test_lovemachine.py -v
+python3 tests/test_inventory.py -v
+```
+
+See [inventory implementation, setup, and limitations](docs/lovemachine-inventory.md).

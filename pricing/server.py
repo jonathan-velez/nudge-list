@@ -140,11 +140,15 @@ def collect(now=None, fetch=fetch_month, state=STATE):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path != '/report':
+        if self.path not in ('/report', '/lovemachine/report'):
             self.send_error(404)
             return
         try:
-            body = collect().encode()
+            if self.path == '/lovemachine/report':
+                import lovemachine
+                body = lovemachine.collect(state=STATE/'lovemachine').encode()
+            else:
+                body = collect().encode()
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain; charset=utf-8')
             self.send_header('Content-Length', str(len(body)))

@@ -1,4 +1,4 @@
-"""Disposable, offline tests for legacy jq and the persistent pricing feed."""
+"""Disposable, offline tests for legacy jq and persistent pricing/inventory feeds."""
 import copy
 import sys
 sys.path.insert(0, "/app")
@@ -207,3 +207,61 @@ price_check(next_month,'same','normal-priced new sessions at month rollover stay
 price_check(next_month,'same','unchanged month after rollover')
 price_server.shutdown(); price_tmp.cleanup()
 print('All persistent pricing HTTP/history tests passed; notifications stayed muted.',flush=True)
+
+# Use the production HTTP handler with a mocked Shopify upstream. Inventory
+# and CD datastore are both disposable; alert delivery remains muted.
+sys.path.insert(0, str(ROOT/'pricing'))
+import lovemachine as inventory
+inventory_rows = json.loads((ROOT/'tests/fixtures/lovemachine-products.json').read_text())
+inventory_original_collect = inventory.collect
+inventory_tmp = tempfile.TemporaryDirectory()
+pricing.STATE = Path(inventory_tmp.name)
+def inventory_fetch(page):
+    if inventory_rows == 'network error':
+        raise OSError('upstream unavailable')
+    return inventory_rows
+inventory.collect = lambda state: inventory_original_collect(fetch=inventory_fetch, state=state)
+inventory_server = HTTPServer(('127.0.0.1',8091), pricing.Handler)
+threading.Thread(target=inventory_server.serve_forever, daemon=True).start()
+watch = json.loads((ROOT/'config/lovemachine.json').read_text())
+watch.update(url='http://127.0.0.1:8091/lovemachine/report', notification_muted=True)
+uid = api('POST','/watch',json=watch)['uuid']; path='/watch/'+uid
+api('GET',path+'?recheck=true')
+for _ in range(600):
+    initial=api('GET',path)
+    if initial['history_n']==1:
+        break
+    time.sleep(.2)
+else:
+    raise AssertionError(('inventory feed baseline failed', initial))
+print('PASS inventory feed: production route and initial baseline',flush=True)
+def inventory_check(rows, expected, name):
+    global inventory_rows
+    inventory_rows = copy.deepcopy(rows)
+    fetch({}, expected, 'inventory feed: '+name)
+boards = copy.deepcopy(inventory_rows)
+restock = copy.deepcopy(boards); restock['products'][1]['variants'][0]['available'] = True
+inventory_check(restock, 'change', '6-6 restock')
+inventory_check(restock, 'same', 'unchanged availability')
+inventory_check(boards, 'same', 'sellout suppressed')
+inventory_check(restock, 'change', 'second restock')
+new_boards = copy.deepcopy(restock)
+for index in (1, 2):
+    new = copy.deepcopy(boards['products'][index]); new['id'] += 1
+    new['variants'][0].update(id=new['variants'][0]['id']+1, available=True)
+    new_boards['products'].append(new)
+inventory_check(new_boards, 'change', 'new 6-4 and 6-6 listings')
+metadata = copy.deepcopy(new_boards)
+metadata['products'].reverse()
+for product in metadata['products']:
+    product['variants'][0]['price'] = '999.00'
+    product['body_html'] = 'edited'
+    if "7'0" in product['title']:
+        product['variants'][0]['available'] = True
+inventory_check(metadata, 'same', 'prices ordering descriptions unrelated inventory')
+inventory_check({'products': []}, 'error', 'empty collection fails closed')
+inventory_check({'products': [{}]}, 'error', 'malformed schema fails closed')
+inventory_check('network error', 'error', 'request failure fails closed')
+inventory_check(metadata, 'same', 'recovery does not alert')
+inventory_server.shutdown(); inventory_tmp.cleanup()
+print('All inventory HTTP/history tests passed; notifications stayed muted.',flush=True)

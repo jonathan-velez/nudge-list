@@ -1,0 +1,15 @@
+{
+  "title": "LoveMachine FM | 6'4 & 6'6 | Inventory",
+  "url": "http://pricing:8080/lovemachine/report",
+  "link_to_open": "https://lovemachinesurfboards.com/collections/all-fm",
+  "fetch_backend": "html_requests",
+  "time_between_check": {"weeks": 0, "days": 0, "hours": 0, "minutes": 10, "seconds": 0},
+  "time_between_check_use_default": false,
+  "paused": false,
+  "notification_muted": true,
+  "notification_urls": [],
+  "notification_title": "LoveMachine FM — board available",
+  "notification_body": "{{ current_snapshot }}",
+  "notification_format": "text",
+  "filter_failure_notification_send": false
+}

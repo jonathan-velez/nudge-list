@@ -1,0 +1,108 @@
+{
+  "products": [
+    {
+      "id": 15396297113874,
+      "title": "7'0 FM",
+      "handle": "70-fm-4",
+      "product_type": "surfboard",
+      "options": [
+        {
+          "name": "Title",
+          "position": 1,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "id": 67589868912914,
+          "title": "Default Title",
+          "available": false,
+          "price": "1025.00",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null
+        }
+      ]
+    },
+    {
+      "id": 15396296982802,
+      "title": "6'6 FM",
+      "handle": "66-fm-19",
+      "product_type": "surfboard",
+      "options": [
+        {
+          "name": "Title",
+          "position": 1,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "id": 67589868716306,
+          "title": "Default Title",
+          "available": false,
+          "price": "1285.00",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null
+        }
+      ]
+    },
+    {
+      "id": 10434926182674,
+      "title": "6'4 FM",
+      "handle": "64-fm-copy",
+      "product_type": "surfboard",
+      "options": [
+        {
+          "name": "Title",
+          "position": 1,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "id": 52711824556306,
+          "title": "Default Title",
+          "available": false,
+          "price": "1025.00",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null
+        }
+      ]
+    },
+    {
+      "id": 10410761224466,
+      "title": "7'0 FM",
+      "handle": "70-fm-copy-1",
+      "product_type": "surfboard",
+      "options": [
+        {
+          "name": "Title",
+          "position": 1,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "id": 52628708753682,
+          "title": "Default Title",
+          "available": false,
+          "price": "1255.00",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null
+        }
+      ]
+    }
+  ]
+}

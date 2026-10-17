@@ -1,3 +1,46 @@
+# LoveMachine FM inventory validation — 2026-10-12
+
+Deployed and enabled **LoveMachine FM | 6'4 & 6'6 | Inventory**, watch ID
+`d5d97674-a28e-4753-92e9-c2506e991c14`, with a ten-minute interval and the
+existing configured ntfy destination. No new service, volume, or
+package was added. The pricing helper was restarted to load its inventory route;
+existing watch settings were captured before deployment and compared unchanged
+afterward. The other concurrent implementation was consolidated after its chat
+completed; unused draft files were preserved in ignored `.local/archive`.
+
+Shopify's public collection endpoint returned four FM products. The matching
+6'4 FM (`64-fm-copy`, price 1025.00) and 6'6 FM (`66-fm-19`, price 1285.00)
+were both unavailable. Each product's `.js` endpoint independently agreed.
+The collection's second page was empty. The deployed baseline was captured at
+2026-10-12 14:48 America/Los_Angeles; two successful checks retained one CD
+history snapshot, zero availability alerts, and no fetch error. Reapplying
+inventory-only setup retained the same watch ID. The initial observation is a
+silent baseline, including any boards already available at first setup.
+
+All 34 offline regression tests passed, including 18 inventory simulations and
+the existing pricing/availability tests. The full disposable CD integration
+suite passed legacy jq, pricing, and inventory-through-production-HTTP-handler
+checks. Inventory tests proved new available listings in both target sizes,
+restocks, a second restock, unchanged availability, silent sellouts, ordering /
+price / description / unrelated-size changes, empty/malformed responses,
+request failure, and recovery without new history. Test notifications were muted;
+production baseline/history was not replaced with fixtures. Each integration run
+now owns a distinct disposable container to avoid concurrent test collisions.
+
+A separate **LoveMachine FM — notification test** was sent using CD's normal
+web session and notification test handler. ntfy's readback confirmed exactly one correctly labelled test message, explicitly
+stating that it was not a stock alert. This verifies delivery to the topic,
+not acknowledgment by a particular subscriber device. No synthetic stock alert
+was sent. CD reported no notification error afterward.
+
+Ten-minute polling and local uptime can miss brief restocks. Public Shopify
+availability is not a checkout reservation. The monitor covers the FM collection
+and recognized model/length notation; valid partial responses and a disappearance
+without an observed sold-out flag can hide changes. See
+[operating notes](lovemachine-inventory.md) for these boundaries and safe tests.
+
+---
+
 # Pricing baseline validation — 2026-10-12
 
 The active **DSRT Surf — Published Session Pricing** watch now fetches
@@ -94,6 +137,33 @@ The three-hour interval is configured and persists, but this initial validation 
 
 The initial 07:59 API inspection contained 173 groups. Started 08:00 sessions disappeared during deployment, leaving 172. This confirms the documented last-representative expiry limitation, rather than a normalization mismatch. No price-drop-only behavior is claimed.
 
+## Availability false-alert fix — October 13, 2026
+
+The availability helper now compares normalized session dictionaries, excluding
+natural expiration, before replacing its alert report. Unchanged collections
+retain the last actual change report. Fresh observations, expired-session counts,
+ordering, and clearing yesterday's change list cannot create alerts. Every
+successful collection still saves current raw data, normalized inventory, and a
+fresh `daily_report`; `report` is the durable alert payload. Existing saved state
+migrates without replacing the CD baseline. Public-session visibility changes
+still alert; returning IDs continue to use the existing NEW label.
+
+Ten unit tests passed. The separate offline HTTP/history integration suite
+(`bash tests/test-integration.sh tests/availability_integration.py`) passed ten
+checks through the pinned changedetection engine: unchanged cached/fresh-day
+collections, genuine decrease, unchanged day after a decrease, restart,
+repeated equal-sized decrease, expiration only, status change, upstream failure,
+and recovery. Delivery remained muted in the disposable container. Replaying
+all three October 11–13 production snapshots reproduced their original reports.
+
+Deployment recreated only the availability container to correct its stale
+bind mount from the former `dsrt-surf-tracker` folder, preserving the existing
+`dsrt-surf-tracker_availability-data` volume. The live watch check count advanced
+from 9 to 11, its three history entries remained unchanged, notification count
+stayed at 2, and fetch/notification errors were false. The URL, notification
+destinations, mute setting, and 19:00–20:00 Pacific schedule were preserved.
+
+
 ## Matching-slot price references — October 17, 2026
 
 New sessions now compare with saved prices for the same session type, weekday,
@@ -130,3 +200,15 @@ three-hour interval were retained. The saved live state has 750 sessions and
 directions. The running source checksum matches the local tested source.
 No additional delivery test was sent during this correction; the earlier
 separate labeled test was accepted by the configured notification service.
+
+
+## Remaining-change review — October 17, 2026
+
+Reviewed the LoveMachine comparator, shared helper route, watch configuration,
+setup scripts, fixtures, and availability report-stability changes before commit.
+All 46 unit tests passed again. The dedicated disposable availability HTTP/history
+suite passed all ten checks; the full pricing/inventory integration suite also
+passed earlier in this session with the same runtime sources. Shell syntax,
+JSON fixtures/configuration, and whitespace checks passed. Removed the private
+notification destination from these public notes. No production state or
+notification settings were changed during this review.

@@ -67,6 +67,13 @@ def clean(a, b):
                and r['effectiveMax'] in (None,r['sessionlimit']) for r in (a,b)) and all(a[k]==b[k] for k in
         ('dateid','starttime','sessiontype','direction','sessionlimit','effectiveMax','waveClass','bayOffering','segmentSpan')) and ((a['effectiveAvailable'] is None)==(b['effectiveAvailable'] is None))
 
+def inventory_changed(previous, current, now):
+    # Compare normalized session data, excluding the natural passage of time.
+    # Retain an expired ID if it has been rescheduled into the future.
+    old = {key: row for key, row in previous['sessions'].items()
+           if starts(row) > now or key in current['sessions']}
+    return old != current['sessions']
+
 def report(previous, current, now):
     rows = current['sessions']
     lines = ['DSRT — Daily upcoming availability', f'Observed: {current["captured_at"]}',
@@ -81,7 +88,7 @@ def report(previous, current, now):
         changes=[]; decreases=increases=expired=0
         for key in sorted(set(old)|set(rows)):
             a,b=old.get(key),rows.get(key)
-            if a and starts(a)<=now:
+            if a and starts(a)<=now and b is None:
                 expired+=1
                 continue
             if a is None:
@@ -125,7 +132,11 @@ def collect(now=None, fetch=fetch_month, state=STATE):
         data[month]=fetch(month); offset+=1
     current={'slot':slot,'captured_at':now.isoformat(),'months':data,
              'sessions':normalize(data,now),'horizon_limited':bool(data[months[-1]])}
-    current['report']=report(previous,current,now)
+    current['daily_report']=report(previous,current,now)
+    # CD sees the last actual change report. Advancing dates, expiration totals,
+    # and clearing yesterday's CHANGES must not create a notification.
+    current['report']=(current['daily_report'] if previous is None or
+                       inventory_changed(previous,current,now) else previous['report'])
     payload=json.dumps(current,indent=2)+'\n'
     # Failure before this point leaves the last valid baseline intact.
     (state/(now.strftime('%Y-%m-%dT%H%M%S%z')+'.json')).write_text(payload)
