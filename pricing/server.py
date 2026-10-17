@@ -1,5 +1,6 @@
 """Persistent session-price comparator; CD schedules checks and sends alerts."""
 import datetime as dt
+import concurrent.futures
 import json
 import math
 import os
@@ -11,13 +12,51 @@ from zoneinfo import ZoneInfo
 TZ = ZoneInfo('America/Los_Angeles')
 STATE = Path(os.environ.get('STATE_DIR', '/state'))
 
+def month_at(now, offset):
+    n = now.year * 12 + now.month - 1 + offset
+    return f'{n // 12:04d}-{n % 12 + 1:02d}'
+
 def fetch_month(month):
     url = f'https://ep.dsrtsurf.com/api/sessions/with/{month}?upcoming=true'
     with urllib.request.urlopen(url, timeout=30) as response:
         return json.load(response)
 
+def fetch_calendar(now, fetch):
+    # Search across empty intervening months, like the availability watch.
+    months = [month_at(now, i) for i in range(13)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        data = dict(zip(months, pool.map(fetch, months)))
+    offset = 13
+    while data[months[-1]] and offset <= 24:
+        month = month_at(now, offset)
+        months.append(month)
+        data[month] = fetch(month)
+        offset += 1
+    rows = []
+    for month in months:
+        if not isinstance(data[month], list):
+            raise ValueError(f'{month}: expected session array; preserve baseline')
+        rows.extend(data[month])
+    return rows, months, bool(data[months[-1]])
+
 def starts(row):
     return dt.datetime.fromisoformat(row['dateid']+'T'+row['starttime']).replace(tzinfo=TZ)
+
+def reference_key(row):
+    # JSON encoding avoids collisions in names and separates each exact weekday,
+    # local start time, and direction. Unknown directions are not comparable.
+    if not isinstance(row['direction'], str) or not row['direction']:
+        return None
+    return json.dumps([row['sessiontype'], starts(row).weekday(),
+                       row['starttime'], row['direction']], ensure_ascii=False)
+
+def reference_prices(sessions):
+    prices = {}
+    for row in sessions.values():
+        key = reference_key(row)
+        if key is not None:
+            prices[key] = min(prices.get(key, row['price']), row['price'])
+    return prices
 
 def normalize(rows, now):
     if not isinstance(rows, list) or not rows:
@@ -55,11 +94,15 @@ def normalize(rows, now):
 def collect(now=None, fetch=fetch_month, state=STATE):
     now = now or dt.datetime.now(TZ)
     # Validate the complete response before touching durable state.
-    sessions = normalize(fetch(now.strftime('%Y-%m')), now)
+    rows, months, horizon_limited = fetch_calendar(now, fetch)
+    sessions = normalize(rows, now)
     state.mkdir(parents=True, exist_ok=True)
     path = state/'latest.json'
     previous = json.loads(path.read_text()) if path.exists() else None
     old = previous['sessions'] if previous else {}
+    # Upgrade older state from its stored observations. Keep reference prices
+    # after individual IDs expire; never learn a new row before comparing it.
+    references = dict(previous.get('reference_prices', reference_prices(old))) if previous else {}
     # Retain missing future sessions, so a temporary removal cannot reset a price.
     baseline = {uid: row for uid, row in old.items() if starts(row) > now}
     changes = []
@@ -67,13 +110,26 @@ def collect(now=None, fetch=fetch_month, state=STATE):
         prior = baseline.get(uid)
         if prior is not None and prior['price'] != row['price']:
             changes.append(f'{row["dateid"]} {row["starttime"]} | {row["sessiontype"]} | {row["direction"]} | {uid} | price {prior["price"]:g} -> {row["price"]:g}')
+        elif prior is None and previous is not None:
+            reference = references.get(reference_key(row))
+            if reference is not None and row['price'] < reference:
+                weekday = starts(row).strftime('%A')
+                changes.append(f'NEW LOWER PRICE | {row["dateid"]} {row["starttime"]} | {row["sessiontype"]} | {row["direction"]} | {uid} | price {row["price"]:g} | {weekday} {row["starttime"]} reference {reference:g} -> {row["price"]:g} ({reference-row["price"]:g} lower)')
         baseline[uid] = row
+    # With multiple prices for an exact slot, use its lowest stored future
+    # price, including temporarily missing IDs. Absent slots retain references.
+    references.update(reference_prices(baseline))
     revision = previous['revision'] if previous else 0
     report = previous['report'] if previous else 'DSRT — Published Session Pricing\nInitial price baseline stored. Waiting for actual price changes.\n'
     if changes:
         revision += 1
-        report = '\n'.join(['DSRT — Published Session Pricing', f'Price change #{revision} | observed {now.isoformat()}', *changes])+'\n'
+        report = '\n'.join(['DSRT — Published Session Pricing', f'Price change #{revision} | observed {now.isoformat()}',
+                            f'Calendar coverage: {months[0]} through {months[-1]}',
+                            *(['Coverage limit: final queried month is populated; farther sessions may exist.'] if horizon_limited else []),
+                            *changes])+'\n'
     current = {'captured_at': now.isoformat(), 'month': now.strftime('%Y-%m'),
+               'months': months, 'horizon_limited': horizon_limited,
+               'reference_prices': references,
                'sessions': baseline, 'revision': revision, 'report': report}
     # One atomic file couples the updated prices and alert payload. No-change
     # checks keep the payload identical, including after a service restart.

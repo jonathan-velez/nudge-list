@@ -3,13 +3,19 @@
   "url": "http://pricing:8080/report",
   "link_to_open": "https://book.dsrtsurf.com/app.html#/calendar",
   "fetch_backend": "html_requests",
-  "time_between_check": {"weeks": 0, "days": 0, "hours": 3, "minutes": 0, "seconds": 0},
+  "time_between_check": {
+    "weeks": 0,
+    "days": 0,
+    "hours": 3,
+    "minutes": 0,
+    "seconds": 0
+  },
   "time_between_check_use_default": false,
   "paused": false,
   "notification_muted": true,
   "notification_urls": [],
   "notification_title": "DSRT published session pricing changed",
-  "notification_body": "DSRT published session prices changed.\nBook: https://book.dsrtsurf.com/app.html#/calendar\n{{ current_snapshot }}",
+  "notification_body": "DSRT pricing update: existing session price changes or new sessions below their matching session type, weekday, time, and direction reference.\nBook: https://book.dsrtsurf.com/app.html#/calendar\n{{ current_snapshot }}",
   "notification_format": "text",
   "filter_failure_notification_send": false
 }

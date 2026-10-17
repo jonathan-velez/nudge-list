@@ -93,3 +93,40 @@ No actual notification delivery was tested or configured. ntfy URL parsing is ve
 The three-hour interval is configured and persists, but this initial validation used manual rechecks rather than waiting three hours. Month/year boundaries were simulated using the application's native renderer; a real future calendar rollover has not yet occurred.
 
 The initial 07:59 API inspection contained 173 groups. Started 08:00 sessions disappeared during deployment, leaving 172. This confirms the documented last-representative expiry limitation, rather than a normalization mismatch. No price-drop-only behavior is claimed.
+
+## Matching-slot price references — October 17, 2026
+
+New sessions now compare with saved prices for the same session type, weekday,
+local start time, and direction. Only a price below that reference emits
+`NEW LOWER PRICE`; normal/higher prices and unknown slots establish baselines
+silently. Existing-ID price increases/decreases still alert. References survive
+expiration and restart; the lowest stored future price is used when a slot has
+multiple prices, with the last reference retained when that slot disappears.
+All new IDs in one collection compare before references update. Old state
+initializes references from its stored sessions without replacing its report.
+This supersedes both the earlier rule ignoring all new IDs and the brief rule
+alerting on every new ID. That earlier notification/history entry is preserved.
+
+The price scan now covers the current month and next 12 months, including empty
+gaps, extending to 24 months ahead when its edge is populated. Overlapping IDs
+are deduplicated and conflicting/failed month responses preserve the baseline.
+
+All 46 unit tests passed, including 18 price tests. The exact Advanced Turns
+Monday 11 AM $200-reference/$180-new-session scenario passed, as did silent
+normal prices, matching-slot isolation, expiration, legacy state, restart,
+minimum-price references, month gaps, overlapping calendars, and failed fetches.
+The full disposable HTTP/history integration suite passed, including cheaper
+new dates, silent ordinary additions, repeat checks, missing/returning IDs,
+existing price edits, restart, month rollover, failure recovery, and inventory
+regressions. Disposable notifications remained muted.
+
+A live-data preview against a copy of the original 511-session baseline found
+239 additional sessions through November 18 and no lower matching-slot prices.
+After deployment, two live rechecks advanced check_count from 61 to 63 while
+history remained at 9 and notification_alert_count at 7. Fetch and notification
+errors were false. The watch identity, destinations, unmuted/active state, and
+three-hour interval were retained. The saved live state has 750 sessions and
+184 slot references, including Advanced Turns Monday 11 AM at $200 in both
+directions. The running source checksum matches the local tested source.
+No additional delivery test was sent during this correction; the earlier
+separate labeled test was accepted by the configured notification service.

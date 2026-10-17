@@ -44,16 +44,31 @@ DSRT session ID in the persistent `pricing-data` Docker volume. The effective
 price is numeric `currentPrice`, with `price` fallback only when currentPrice
 is absent/null. Integer/decimal formatting is equivalent.
 
-Only an increase or decrease for an already observed session ID changes the
-feed and triggers an alert. Every successful collection updates the baseline.
-New sessions establish their baseline silently; removals, expiration, names,
-directions, availability, capacity, and calendar rollover do not trigger alerts.
-Missing future sessions retain their last observed price until their start time,
-so temporary disappearance/reappearance does not reset their baseline. Expired
-baseline entries are pruned. A changed price on a replacement/new session ID
-cannot be confirmed as a price edit and establishes a new baseline silently.
+An increase or decrease for an already observed session ID triggers an alert.
+For a new ID, the monitor compares its price with a saved reference matching
+**session type, weekday, local start time, and direction**. A lower price triggers
+**NEW LOWER PRICE**, with its date, time, direction, ID, reference price, new price,
+and savings. For example, a new Monday 11 AM Advanced Turns Left session at $180
+alerts against a matching $200 reference. A normal-priced or higher-priced new
+session stays silent. A slot with no matching reference establishes one silently.
 
-The alert report includes the session, date/time, direction, ID, and old/new price.
+Reference prices survive individual session expiration and restarts. When an exact
+slot has multiple stored future prices, the lowest is the reference, so an already
+available cheaper tier does not create a false reduction. All comparisons use the
+previous saved references before learning the current collection. After a successful
+collection, references update to the lowest stored future price for each slot;
+slots with no remaining future sessions retain their last reference. Older state
+initializes these references from its saved sessions without clearing history.
+
+The initial installation baseline is silent. Removals, expiration, names,
+directions, availability, capacity, and calendar rollover alone do not trigger
+alerts. Missing future sessions retain their last observed price until their start
+time, so temporary disappearance/reappearance does not reset a baseline or repeat
+an alert. Expired session IDs are pruned; their slot references are retained.
+Replacement IDs use the same comparison rule as new IDs. Confirmed price edits
+include the old/new price; new lower prices are comparisons against the matching
+slot reference, rather than claims that the new ID previously had a higher price.
+
 The last price-change report stays identical through subsequent no-change checks
 and restarts; there is no alert when the report returns to an empty state.
 Prices and report are saved together with an atomic file replacement. CD retains
@@ -69,12 +84,16 @@ Empty, malformed, wrong-schema, and failed HTTP responses produce watch errors a
 ## Dates and normal calendar changes
 
 The internal feed at `http://pricing:8080/report` requests the Pacific current
-month from DSRT with `upcoming=true` at each check. No monthly script or manual
-update is needed. The API returns a padded calendar window, not all future
-sessions, and removes started/past sessions. See [live API findings](docs/api-findings.md).
-The pricing watch retains its current-month coverage; daily availability has its
-own broader horizon. Removed sessions and month rollover update stored baseline
-state without changing the price alert payload.
+month and next 12 months from DSRT with `upcoming=true` at each check, including
+empty intervening months. If the final month is populated, it extends up to 24
+months ahead and flags the limit if still populated. This is bounded discovery,
+not a guarantee of unlimited coverage. Overlapping sessions are deduplicated by
+ID; conflicting responses fail without replacing the baseline. No monthly script
+or manual update is needed. The API returns a padded calendar window for each
+month and removes started/past sessions. See [live API findings](docs/api-findings.md).
+Removed/expired sessions and the passage of time are silent. New sessions
+at month rollover alert only when cheaper than their matching saved slot reference.
+Calendar expansion uses the same rule; ordinary additions stay silent.
 
 For an existing deployment, migrate the watch once with:
 
@@ -126,10 +145,10 @@ cp config/watch.json .local/watch.json
 ./scripts/setup-watch.sh .local/watch.json
 ```
 
-The prepared message reports actual price increases or decreases and links to
-the booking calendar. It includes the latest price-change report rather than
-calendar schedule diffs. The configured ntfy destination is used by both local
-active watches and kept out of version control.
+The prepared message reports existing-session price changes or new sessions below
+their matching slot reference, and links to the booking calendar. It includes the
+latest pricing report rather than calendar schedule diffs. The configured ntfy
+destination is used by both local active watches and kept out of version control.
 
 ## Optional catalog
 
