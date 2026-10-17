@@ -243,3 +243,35 @@ zero and tonight's window was eligible after verification. The dedicated
 availability pipeline suite passed again with the updated template. This verifies
 configuration eligibility, not observation of the future 7 PM run; the Mac and
 Docker must be awake then. No additional labeled delivery test was sent.
+
+
+## Sequential three-month DSRT collection — October 17, 2026
+
+Both DSRT helpers now request only the Pacific current month and the following
+two months. Requests are sequential, with an independently drawn uniform 2–4
+second sleep after each completed request except the last. A populated third
+month never extends the scan. Overlap validation, effective-price comparisons,
+slot references, daily caching, and atomic failure-safe baselines are retained.
+An availability cache created under the older horizon refreshes once even within
+the same daily slot. The helper still caches subsequent unchanged same-slot calls.
+
+All 48 unit tests passed. Timing tests assert fetch/pause ordering, two random
+draws with bounds 2 and 4, exactly three months across year rollover, and no
+extension when the edge is populated. Tests also cover old-cache refresh and
+third-month failures without baseline replacement. Separate tests using real
+sleep and synthetic upstreams measured pricing gaps of 3.466 and 3.005 seconds,
+and availability gaps of 3.849 and 2.855 seconds. Both disposable HTTP/history
+integration suites passed; their waits are stubbed while unit and timing checks
+verify throttling separately. Notifications remained muted in disposable tests.
+
+Deployed by restarting only pricing and availability, preserving volumes and watch
+settings. One live check each saved exactly 2026-10, 2026-11, and 2026-12; source
+hashes in the containers matched the tested files. Pricing advanced 65 to 66 checks
+without new history or notification. Availability advanced 17 to 18, producing one
+real inventory-change alert (including availability 1 -> 0 and 2 -> 3), with expired
+sessions excluded from bookings. Both fetch and notification errors were false.
+The three-hour pricing interval, 7 PM availability window, ten-minute LoveMachine
+interval, notification destinations, and active states were unchanged. Expected
+successful scheduled DSRT traffic is now 27 requests/day rather than 117,
+excluding manual checks and failures. No automatic scan beyond the third month
+remains; DSRT's padded response dates can still overlap adjacent calendar months.

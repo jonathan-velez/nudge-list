@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('pricing', Path(__file__).resolve().parents[1]/'pricing/server.py')
 pricing = importlib.util.module_from_spec(spec)
@@ -13,6 +14,9 @@ spec.loader.exec_module(pricing)
 
 class PricingTests(unittest.TestCase):
     def setUp(self):
+        pause = patch.object(pricing, "sleep")
+        pause.start()
+        self.addCleanup(pause.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.state = Path(self.tmp.name)
@@ -40,6 +44,7 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(self.collect(), report)
         self.assertEqual(self.collect(rows), report)
         reloaded = importlib.util.module_from_spec(spec); spec.loader.exec_module(reloaded)
+        reloaded.sleep = lambda seconds: None
         self.assertEqual(reloaded.collect(self.now, lambda month: rows, self.state), report)
         rows[-1]['currentPrice'] = 90
         self.assertIn('price 99 -> 90', self.collect(rows))
@@ -69,6 +74,7 @@ class PricingTests(unittest.TestCase):
         new = copy.deepcopy(self.rows[0])
         new.update(_id='new-monday', dateid='2026-10-26', currentPrice=200)
         reloaded = importlib.util.module_from_spec(spec); spec.loader.exec_module(reloaded)
+        reloaded.sleep = lambda seconds: None
         report = reloaded.collect(now, lambda month: [other,new], self.state)
         self.assertIn('Monday 08:00 reference 220 -> 200', report)
         self.assertEqual(reloaded.collect(now, lambda month: [other,new], self.state),report)
@@ -171,6 +177,7 @@ class PricingTests(unittest.TestCase):
         rows = copy.deepcopy(self.rows); rows[1]['currentPrice'] = 225
         report = self.collect(rows)
         reloaded = importlib.util.module_from_spec(spec); spec.loader.exec_module(reloaded)
+        reloaded.sleep = lambda seconds: None
         self.assertEqual(reloaded.collect(self.now, lambda month: rows, self.state), report)
         self.assertIn('price 225 -> 220', self.collect())
 
@@ -182,7 +189,7 @@ class PricingTests(unittest.TestCase):
                 months.append(month); return rows
             report = pricing.collect(now, fetch, self.state)
             self.assertEqual(report, self.base)
-            self.assertEqual(set(months), {pricing.month_at(now,i) for i in range(25)})
+            self.assertEqual(set(months), {pricing.month_at(now,i) for i in range(3)})
             self.assertEqual(pricing.collect(now, fetch, self.state), report)
 
     def test_future_month_after_empty_gap_and_overlap(self):
@@ -194,8 +201,8 @@ class PricingTests(unittest.TestCase):
         self.assertIn('NEW LOWER PRICE | 2026-12-21', report)
         self.assertEqual(report.count('NEW LOWER PRICE'), 1)
         state = json.loads((self.state/'latest.json').read_text())
-        self.assertEqual(len(state['months']), 13)
-        self.assertFalse(state['horizon_limited'])
+        self.assertEqual(len(state['months']), 3)
+        self.assertTrue(state['horizon_limited'])
 
     def test_later_month_failure_and_conflicting_overlap_preserve_baseline(self):
         path = self.state/'latest.json'
@@ -211,14 +218,20 @@ class PricingTests(unittest.TestCase):
                 pricing.collect(self.now, fetch, self.state)
             self.assertEqual(path.read_bytes(), baseline)
 
-    def test_populated_edge_extends_to_cap_and_reports_limit(self):
-        months = []
+    def test_three_months_sequential_with_random_pauses_and_no_extension(self):
+        events = []
+        now = dt.datetime(2026,12,1,tzinfo=pricing.TZ)
         def fetch(month):
-            months.append(month)
+            events.append(('fetch',month))
             return self.rows
-        rows, queried, limited = pricing.fetch_calendar(self.now, fetch)
-        self.assertEqual(len(queried), 25)
-        self.assertEqual(queried[-1], '2028-10')
+        with patch.object(pricing,'sleep',side_effect=lambda seconds: events.append(('pause',seconds))), \
+             patch.object(pricing,'uniform',side_effect=[2,4]) as random_delay:
+            rows, queried, limited = pricing.fetch_calendar(now,fetch)
+        self.assertEqual(queried,['2026-12','2027-01','2027-02'])
+        self.assertEqual(events,[('fetch','2026-12'),('pause',2),('fetch','2027-01'),
+                                 ('pause',4),('fetch','2027-02')])
+        self.assertEqual(random_delay.call_count,2)
+        random_delay.assert_called_with(2,4)
         self.assertTrue(limited)
 
 if __name__ == '__main__':

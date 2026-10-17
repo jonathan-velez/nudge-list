@@ -13,6 +13,7 @@ import requests
 ROOT = Path('/work')
 spec = importlib.util.spec_from_file_location('availability', ROOT/'availability/server.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+m.sleep = lambda seconds: None
 now = dt.datetime(2026,10,11,22,tzinfo=m.TZ)
 rows = [{'_id':'a','dateid':'2026-10-20','starttime':'10:00','sessiontype':'Turns',
          'direction':'Left','waveClass':'reef','audience':'public','sessionlimit':10,
@@ -80,6 +81,7 @@ now+=dt.timedelta(days=1); check('change','three spots decrease')
 now+=dt.timedelta(days=1); check('same','next day does not clear prior alert')
 # Module reload exercises durable payload across restarts.
 spec.loader.exec_module(m)
+m.sleep = lambda seconds: None
 m.collect=lambda: original_collect(now,upstream,Path(state.name))
 now+=dt.timedelta(days=1); check('same','restart retains last actual change')
 rows[0].update(available=2,effectiveAvailable=2)

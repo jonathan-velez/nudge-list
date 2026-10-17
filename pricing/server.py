@@ -1,6 +1,7 @@
 """Persistent session-price comparator; CD schedules checks and sends alerts."""
 import datetime as dt
-import concurrent.futures
+from random import uniform
+from time import sleep
 import json
 import math
 import os
@@ -22,22 +23,17 @@ def fetch_month(month):
         return json.load(response)
 
 def fetch_calendar(now, fetch):
-    # Search across empty intervening months, like the availability watch.
-    months = [month_at(now, i) for i in range(13)]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        data = dict(zip(months, pool.map(fetch, months)))
-    offset = 13
-    while data[months[-1]] and offset <= 24:
-        month = month_at(now, offset)
-        months.append(month)
-        data[month] = fetch(month)
-        offset += 1
+    months = [month_at(now, i) for i in range(3)]
     rows = []
-    for month in months:
-        if not isinstance(data[month], list):
+    last_rows = []
+    for index, month in enumerate(months):
+        if index:
+            sleep(uniform(2, 4))
+        last_rows = fetch(month)
+        if not isinstance(last_rows, list):
             raise ValueError(f'{month}: expected session array; preserve baseline')
-        rows.extend(data[month])
-    return rows, months, bool(data[months[-1]])
+        rows.extend(last_rows)
+    return rows, months, bool(last_rows)
 
 def starts(row):
     return dt.datetime.fromisoformat(row['dateid']+'T'+row['starttime']).replace(tzinfo=TZ)

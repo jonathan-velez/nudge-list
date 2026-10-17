@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('availability',Path(__file__).parents[1]/'availability/server.py')
 m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
@@ -15,6 +16,51 @@ def snapshot(raw):
     return {'captured_at':NOW.isoformat(),'months':{'2026-10':[raw]},'sessions':m.normalize({'2026-10':[raw]},NOW)}
 
 class AvailabilityTests(unittest.TestCase):
+    def setUp(self):
+        pause = patch.object(m,"sleep")
+        pause.start()
+        self.addCleanup(pause.stop)
+    def test_three_month_limit_sequential_pauses_and_cached_repeat(self):
+        now=dt.datetime(2026,12,15,22,tzinfo=m.TZ)
+        row=dict(RAW,dateid='2027-01-20')
+        events=[]
+        def fetch(month):
+            events.append(('fetch',month))
+            return [row]
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(m,'sleep',side_effect=lambda seconds: events.append(('pause',seconds))), \
+             patch.object(m,'uniform',side_effect=[2,4]) as delay:
+            state=Path(folder)
+            report=m.collect(now,fetch,state)
+            self.assertEqual(events,[('fetch','2026-12'),('pause',2),('fetch','2027-01'),
+                                     ('pause',4),('fetch','2027-02')])
+            self.assertEqual(delay.call_count,2)
+            delay.assert_called_with(2,4)
+            self.assertEqual(report,m.collect(now+dt.timedelta(minutes=5),fetch,state))
+            self.assertEqual(len(events),5)
+            self.assertEqual(list(json.loads((state/'latest.json').read_text())['months']),
+                             ['2026-12','2027-01','2027-02'])
+
+    def test_cached_old_horizon_refreshes_without_new_alert_and_failure_preserves_state(self):
+        with tempfile.TemporaryDirectory() as folder:
+            state=Path(folder)
+            m.collect(NOW,lambda month:[RAW],state)
+            path=state/'latest.json'; old=json.loads(path.read_text())
+            old['months']['2027-01']=[]
+            path.write_text(json.dumps(old))
+            calls=[]
+            def fetch(month):
+                calls.append(month)
+                return [RAW]
+            self.assertEqual(old['report'],m.collect(NOW,fetch,state))
+            self.assertEqual(calls,['2026-10','2026-11','2026-12'])
+            saved=path.read_bytes()
+            def invalid(month):
+                return {} if month=='2026-12' else [RAW]
+            with self.assertRaises(ValueError):
+                m.collect(NOW+dt.timedelta(days=1),invalid,state)
+            self.assertEqual(path.read_bytes(),saved)
+
     def test_decrease_and_capacity_exclusion(self):
         old=snapshot(RAW); changed=dict(RAW,available=5,effectiveAvailable=5)
         self.assertIn('Possible net booked spots: 3',m.report(old,snapshot(changed),NOW))
@@ -41,10 +87,10 @@ class AvailabilityTests(unittest.TestCase):
                 calls.append(month)
                 return [RAW] if month=='2026-10' else []
             body=m.collect(NOW,fetch,state)
-            self.assertEqual(13,len(calls))
-            self.assertIn('2027-10',calls)
+            self.assertEqual(3,len(calls))
+            self.assertEqual(calls,['2026-10','2026-11','2026-12'])
             self.assertEqual(body,m.collect(NOW+dt.timedelta(minutes=5),fetch,state))
-            self.assertEqual(13,len(calls))
+            self.assertEqual(3,len(calls))
             prior=(state/'latest.json').read_bytes()
             def fail(month): raise ValueError('upstream failure')
             with self.assertRaises(ValueError): m.collect(NOW+dt.timedelta(days=1),fail,state)

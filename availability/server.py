@@ -1,5 +1,6 @@
 """Internal CD feed: multi-month availability and one cached report per 19:00 slot."""
-import concurrent.futures
+from random import uniform
+from time import sleep
 import datetime as dt
 import json
 import os
@@ -120,16 +121,16 @@ def collect(now=None, fetch=fetch_month, state=STATE):
     state.mkdir(parents=True,exist_ok=True)
     path=state/'latest.json'
     previous=json.loads(path.read_text()) if path.exists() else None
-    if previous and previous['slot']==slot:
+    months=[month_at(now,i) for i in range(3)]
+    if previous and previous['slot']==slot and list(previous['months'])==months:
         return previous['report']
-    months=[month_at(now,i) for i in range(13)]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        data=dict(zip(months,pool.map(fetch,months)))
-    # Continue if the edge is populated, with an explicit two-year safety limit.
-    offset=13
-    while data[months[-1]] and offset<=24:
-        month=month_at(now,offset); months.append(month)
-        data[month]=fetch(month); offset+=1
+    data={}
+    for index, month in enumerate(months):
+        if index:
+            sleep(uniform(2,4))
+        data[month]=fetch(month)
+        if not isinstance(data[month],list):
+            raise ValueError(f'{month}: expected session array; preserve baseline')
     current={'slot':slot,'captured_at':now.isoformat(),'months':data,
              'sessions':normalize(data,now),'horizon_limited':bool(data[months[-1]])}
     current['daily_report']=report(previous,current,now)

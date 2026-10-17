@@ -143,6 +143,7 @@ import importlib.util
 import tempfile
 spec = importlib.util.spec_from_file_location('pricing', ROOT/'pricing/server.py')
 pricing = importlib.util.module_from_spec(spec); spec.loader.exec_module(pricing)
+pricing.sleep = lambda seconds: None
 price_rows = copy.deepcopy(fixture)
 price_now = dt.datetime(2026,10,10,12,tzinfo=pricing.TZ)
 price_tmp = tempfile.TemporaryDirectory()
@@ -195,6 +196,7 @@ price_check(changed, 'same', 'unchanged after decrease')
 price_check(changed[:2], 'same', 'removal after decrease')
 # Reloading the module emulates a process restart; durable prices/report survive.
 pricing = importlib.util.module_from_spec(spec); spec.loader.exec_module(pricing)
+pricing.sleep = lambda seconds: None
 price_check(changed, 'same', 'restart preserves payload')
 changed[0]['currentPrice']=210
 price_check(changed, 'change', 'increase uses updated 200 baseline')

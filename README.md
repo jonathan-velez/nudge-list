@@ -83,10 +83,11 @@ Empty, malformed, wrong-schema, and failed HTTP responses produce watch errors a
 ## Dates and normal calendar changes
 
 The internal feed at `http://pricing:8080/report` requests the Pacific current
-month and next 12 months from DSRT with `upcoming=true` at each check, including
-empty intervening months. If the final month is populated, it extends up to 24
-months ahead and flags the limit if still populated. This is bounded discovery,
-not a guarantee of unlimited coverage. Overlapping sessions are deduplicated by
+month and next two months from DSRT with `upcoming=true` at each check,
+including empty intervening months. The three requests run sequentially, with
+an independently random 2–4 second pause between completed requests. There is no
+automatic extension beyond those three month endpoints, even if the last one
+contains sessions. Overlapping sessions are deduplicated by
 ID; conflicting responses fail without replacing the baseline. No monthly script
 or manual update is needed. The API returns a padded calendar window for each
 month and removes started/past sessions. See [live API findings](docs/api-findings.md).
@@ -177,7 +178,16 @@ bash scripts/setup-local.sh
 python3 tests/test_availability.py
 ```
 
-Open the watch's Preview for the most recent actual change report or Diff/history for saved changes. It fetches the current month and the next 12 months, including empty intervening months, deduplicates overlapping calendars by session ID, and tracks all public, non-private reef and bay sessions. If the final month is populated it extends the search, up to 24 months ahead, and flags that limit if still populated. This is bounded discovery, not a promise of unlimited future coverage.
+Open the watch's Preview for the most recent actual change report or Diff/history
+for saved changes. It fetches the current month and next two months, including
+empty intervening months, deduplicates overlapping calendars by session ID, and
+tracks public, non-private reef and bay sessions. Requests are sequential with
+an independently random 2–4 second pause between them. The scan does not extend
+beyond these three month endpoints. DSRT can pad each monthly response with
+adjacent dates; this is a limit on requested months, not an exact date cutoff.
+A populated final month is flagged because farther inventory may exist.
+At the normal schedules this is 24 pricing requests plus three availability
+requests per day (27 total), excluding manual checks and failures.
 
 The report lists availability decreases/increases, new and removed sessions, expired sessions, and the full upcoming inventory. Only clean reef availability decreases are totaled as **possible net bookings**. Capacity, cart, blocking, schedule, and shared bay inventory changes are excluded from those totals. Expired or missing sessions are never interpreted as bookings. The public API cannot establish gross sales or attendance, and bookings/cancellations between snapshots can offset each other.
 
