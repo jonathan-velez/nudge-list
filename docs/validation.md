@@ -212,3 +212,34 @@ passed earlier in this session with the same runtime sources. Shell syntax,
 JSON fixtures/configuration, and whitespace checks passed. Removed the private
 notification destination from these public notes. No production state or
 notification settings were changed during this review.
+
+
+## Combined-commit and live verification — October 17, 2026
+
+Verified the clean combined tree at 2a2c5cf and GitHub main matched. Source hashes
+inside both running helpers matched the committed pricing, LoveMachine, and
+availability files. All 46 unit tests and 24 normalization checks passed. Both
+isolated HTTP/history suites passed against the final combined sources: pricing
+and inventory, plus all ten availability checks. Simulated changes never touched
+production baselines or sent notifications.
+
+Two real checks of each active watch succeeded without fetch or notification
+errors. Pricing advanced 63 to 65 checks with history 9 and notifications 7
+unchanged. LoveMachine advanced 113 to 115 with history 3 and notifications 2
+unchanged. Availability advanced 15 to 17: its first fresh collection detected
+real availability changes and created one history entry and alert; the repeat
+created neither. Watch identities, destinations, and active/unmuted state were
+preserved. LoveMachine's live interval had drifted to 60 minutes; following user
+confirmation it was restored to the committed 10 minutes, and another successful
+unchanged check advanced its count to 116 without history or notification changes.
+
+The audit also identified a scheduling edge: CD applies its minimum interval to
+manual checks, so the availability watch's 12-hour interval could suppress a
+7 PM check after an afternoon recheck. Changed the template and live minimum to
+one hour, matching the 19:00–20:00 Pacific window. The existing helper still
+collects only once per 19:00-to-19:00 period. All seven daily windows, history,
+notification destinations, and cache boundary were preserved; live jitter was
+zero and tonight's window was eligible after verification. The dedicated
+availability pipeline suite passed again with the updated template. This verifies
+configuration eligibility, not observation of the future 7 PM run; the Mac and
+Docker must be awake then. No additional labeled delivery test was sent.

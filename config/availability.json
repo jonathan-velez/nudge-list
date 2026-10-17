@@ -1,12 +1,12 @@
 {
-  "title": "DSRT Surf \u2014 Daily Upcoming Availability",
+  "title": "DSRT Surf — Daily Upcoming Availability",
   "url": "http://availability:8080/report",
   "link_to_open": "https://book.dsrtsurf.com/app.html#/calendar",
   "fetch_backend": "html_requests",
   "time_between_check": {
     "weeks": 0,
     "days": 0,
-    "hours": 12,
+    "hours": 1,
     "minutes": 0,
     "seconds": 0
   },

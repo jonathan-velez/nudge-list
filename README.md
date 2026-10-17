@@ -164,8 +164,8 @@ internal pricing and availability helpers. It permits private-network fetching f
 watch, so only add watches you trust. The UI remains bound to localhost.
 
 The **DSRT Surf — Daily Upcoming Availability** watch runs in CD's
-**19:00–20:00 America/Los_Angeles** window. Its 12-hour minimum interval allows
-one scheduled check per window while avoiding 24-hour drift and DST skips. The
+**19:00–20:00 America/Los_Angeles** window. Its one-hour minimum interval matches
+the window, allowing a nightly check even after an afternoon manual recheck. The
 helper caches one successful collection per 19:00-to-19:00 period; manual
 rechecks reuse it. Setup creates a baseline immediately. Docker and the Mac
 must be awake during the nightly window; missed days produce a comparison
