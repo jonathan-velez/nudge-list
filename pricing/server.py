@@ -141,11 +141,14 @@ def collect(now=None, fetch=fetch_month, state=STATE):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path not in ('/report', '/lovemachine/report'):
+        if self.path not in ('/report', '/lovemachine/report', '/daydream/report'):
             self.send_error(404)
             return
         try:
-            if self.path == '/lovemachine/report':
+            if self.path == '/daydream/report':
+                import daydream
+                body = daydream.collect(state=STATE/'daydream').encode()
+            elif self.path == '/lovemachine/report':
                 import lovemachine
                 body = lovemachine.collect(state=STATE/'lovemachine').encode()
             else:

@@ -24,3 +24,9 @@ jq --slurpfile pricing "$pricing" \
   '. + {notification_muted: false, notification_urls: $pricing[0].notification_urls}' \
   config/lovemachine.json > "$tmp/lovemachine.json"
 bash scripts/setup-watch.sh "$tmp/lovemachine.json" none
+
+# Daydream uses the same local notification settings as the other watches.
+jq --slurpfile local "$pricing" \
+  '. + {notification_urls: $local[0].notification_urls, notification_muted: false}' \
+  config/daydream.json > "$tmp/daydream.json"
+bash scripts/setup-watch.sh "$tmp/daydream.json" none

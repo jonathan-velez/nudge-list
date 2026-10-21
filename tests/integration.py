@@ -267,3 +267,36 @@ inventory_check('network error', 'error', 'request failure fails closed')
 inventory_check(metadata, 'same', 'recovery does not alert')
 inventory_server.shutdown(); inventory_tmp.cleanup()
 print('All inventory HTTP/history tests passed; notifications stayed muted.',flush=True)
+
+# Exercise Daydream through its production HTTP route and CD history.
+inventory.collect = inventory_original_collect
+import daydream
+daydream_original_collect = daydream.collect
+inventory_rows = json.loads((ROOT/'tests/fixtures/daydream-products.json').read_text())
+inventory_tmp = tempfile.TemporaryDirectory()
+pricing.STATE = Path(inventory_tmp.name)
+daydream.collect = lambda state: daydream_original_collect(fetch=inventory_fetch, state=state)
+inventory_server = HTTPServer(('127.0.0.1',8092), pricing.Handler)
+threading.Thread(target=inventory_server.serve_forever, daemon=True).start()
+watch = json.loads((ROOT/'config/daydream.json').read_text())
+watch.update(url='http://127.0.0.1:8092/daydream/report', notification_muted=True)
+uid = api('POST','/watch',json=watch)['uuid']; path='/watch/'+uid
+api('GET',path+'?recheck=true')
+for _ in range(600):
+    initial=api('GET',path)
+    if initial['history_n']==1:
+        break
+    time.sleep(.2)
+else:
+    raise AssertionError(('Daydream baseline failed', initial))
+boards = copy.deepcopy(inventory_rows)
+restock = copy.deepcopy(boards)
+linked = next(r for r in restock['products'] if r['handle'] == '6-6-lovemachine-fm')
+linked['variants'][0]['available'] = True
+inventory_check(restock, 'change', 'Daydream linked 6-6 restock')
+inventory_check(restock, 'same', 'Daydream unchanged stock')
+inventory_check(boards, 'same', 'Daydream silent sellout')
+inventory_check('network error', 'error', 'Daydream upstream failure')
+inventory_check(boards, 'same', 'Daydream recovery')
+inventory_server.shutdown(); inventory_tmp.cleanup()
+print('All Daydream HTTP/history tests passed; notifications stayed muted.',flush=True)

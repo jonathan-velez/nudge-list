@@ -46,6 +46,36 @@ CD supports native additions-only diffs, but the comparator retains history to
 distinguish new listings from restocks, include prices without price-only
 alerts, and reliably handle simultaneous additions and removals.
 
+## Daydream Surf Shop
+
+**Daydream | LoveMachine FM | 6'6 | Inventory** checks the
+[new surfboards collection](https://daydreamsurfshop.com/collections/new-surfboards)
+every 10 minutes using the same validated Shopify comparator. It discovers all
+6'6 LoveMachine FM listings, including the original
+[linked board](https://daydreamsurfshop.com/products/6-6-lovemachine-fm), without
+hardcoded product handles. A standalone FM model, LoveMachine brand in title or
+vendor, and a recognized 6'6 length are required. Other brands and sizes are excluded.
+
+The separate `/daydream/report` route, `/state/daydream/latest.json` state, and
+CD watch keep the manufacturer's existing baseline and history intact. Restocks
+and new available listings alert; initial observations, sellouts, price edits,
+and metadata edits are silent. Failed fetches preserve the previous baseline.
+The existing pricing helper, volume, and notification channel are reused.
+
+On October 21, 2026, collection JSON contained two sold-out 6'6 FM listings at
+$1,100 each, including the linked board. The same collection also listed an
+available 6'4 FM; it is outside this Daydream watch's 6'6 scope. Retail stock can
+change between checks. Collection removal can hide a subsequent restock, and
+only listings in the configured new-board collection are discovered.
+
+Deployed October 21, 2026 as watch `d02c5693-0988-4990-9fee-7bb008b91807`.
+Live verification confirmed a successful baseline, an unchanged second check
+with one history entry and zero alerts, no fetch error, enabled notifications,
+and the same notification destination as DSRT pricing. All 52 unit tests and
+the disposable HTTP/CD history integration suite passed, including Daydream
+restock, silent sellout, upstream failure, and recovery. No live notification
+was sent for this addition. No manual setup steps remain.
+
 ## Apply settings
 
 ```sh
@@ -53,8 +83,9 @@ docker compose restart pricing
 bash scripts/setup-lovemachine.sh
 ```
 
+Both inventory watches are applied by the commands above.
 The inventory-only setup reads the enabled pricing watch's current notification
-destinations and updates only the exact inventory title. It refuses ambiguous
+destinations and updates only the exact inventory titles. It refuses ambiguous
 pricing titles or missing active destinations. `bash scripts/setup-local.sh`
 applies ignored `.local/watch.json` notification settings to all active watches.
 The committed watch template is muted until one of these setup scripts supplies
@@ -65,6 +96,7 @@ the installation's notification destinations.
 ```sh
 python3 tests/test_lovemachine.py -v
 python3 tests/test_inventory.py -v
+python3 tests/test_daydream.py -v
 ./tests/test-integration.sh
 ```
 

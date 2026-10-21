@@ -1,0 +1,21 @@
+{
+  "title": "Daydream | LoveMachine FM | 6'6 | Inventory",
+  "url": "http://pricing:8080/daydream/report",
+  "link_to_open": "https://daydreamsurfshop.com/collections/new-surfboards",
+  "fetch_backend": "html_requests",
+  "time_between_check": {
+    "weeks": 0,
+    "days": 0,
+    "hours": 0,
+    "minutes": 10,
+    "seconds": 0
+  },
+  "time_between_check_use_default": false,
+  "paused": false,
+  "notification_muted": true,
+  "notification_urls": [],
+  "notification_title": "Daydream \u2014 LoveMachine FM 6'6 available",
+  "notification_body": "{{ current_snapshot }}",
+  "notification_format": "text",
+  "filter_failure_notification_send": false
+}

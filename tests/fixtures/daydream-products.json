@@ -1,0 +1,112 @@
+{
+  "products": [
+    {
+      "id": 9979563704567,
+      "title": "6'4\u201d Lovemachine FM",
+      "vendor": "Lovemachine",
+      "handle": "64-lovemachine-fm",
+      "variants": [
+        {
+          "id": 50795439259895,
+          "title": "Default Title",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "sku": "LM-FM-64",
+          "requires_shipping": false,
+          "taxable": true,
+          "featured_image": null,
+          "available": true,
+          "price": "1100.00",
+          "grams": 9072,
+          "compare_at_price": null,
+          "position": 1,
+          "product_id": 9979563704567,
+          "created_at": "2026-05-20T19:57:58-07:00",
+          "updated_at": "2026-10-21T14:34:50-07:00"
+        }
+      ]
+    },
+    {
+      "id": 9979563966711,
+      "title": "6'6\u201d Lovemachine FM",
+      "vendor": "Lovemachine",
+      "handle": "66-lovemachine-fm",
+      "variants": [
+        {
+          "id": 50795440931063,
+          "title": "Default Title",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "sku": "LM-FM-66",
+          "requires_shipping": false,
+          "taxable": true,
+          "featured_image": null,
+          "available": false,
+          "price": "1100.00",
+          "grams": 9072,
+          "compare_at_price": null,
+          "position": 1,
+          "product_id": 9979563966711,
+          "created_at": "2026-05-20T20:01:28-07:00",
+          "updated_at": "2026-10-21T14:34:50-07:00"
+        }
+      ]
+    },
+    {
+      "id": 9898981261559,
+      "title": "6\u20199\u201d Lovemachine FM",
+      "vendor": "Lovemachine",
+      "handle": "6-9-lovemachine-fm-2",
+      "variants": [
+        {
+          "id": 50477016744183,
+          "title": "Default Title",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "sku": "LM-FM-69",
+          "requires_shipping": false,
+          "taxable": true,
+          "featured_image": null,
+          "available": true,
+          "price": "1100.00",
+          "grams": 9072,
+          "compare_at_price": null,
+          "position": 1,
+          "product_id": 9898981261559,
+          "created_at": "2026-02-05T16:23:33-08:00",
+          "updated_at": "2026-10-21T14:34:50-07:00"
+        }
+      ]
+    },
+    {
+      "id": 9731545235703,
+      "title": "6\u20196\u201d Lovemachine FM",
+      "vendor": "Lovemachine",
+      "handle": "6-6-lovemachine-fm",
+      "variants": [
+        {
+          "id": 49811091849463,
+          "title": "Default Title",
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "sku": null,
+          "requires_shipping": false,
+          "taxable": true,
+          "featured_image": null,
+          "available": false,
+          "price": "1100.00",
+          "grams": 9072,
+          "compare_at_price": null,
+          "position": 1,
+          "product_id": 9731545235703,
+          "created_at": "2025-06-27T11:06:27-07:00",
+          "updated_at": "2026-10-21T14:34:50-07:00"
+        }
+      ]
+    }
+  ]
+}

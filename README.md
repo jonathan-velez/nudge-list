@@ -245,6 +245,11 @@ only newly available matching listings or restocks. Sold-outs and metadata edits
 are silent. It shares the existing pricing helper container and storage, with
 no new service or dependency. Notifications reuse the existing channels.
 
+**Daydream | LoveMachine FM | 6'6 | Inventory** also checks Daydream Surf Shop's
+new-board collection every **10 minutes**, including the linked 6'6 FM and future
+matching listings. It uses a separate watch and baseline with the same restock
+rules and notification channel. Other Daydream brands and sizes are excluded.
+
 ```sh
 docker compose restart pricing
 bash scripts/setup-lovemachine.sh

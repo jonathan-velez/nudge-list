@@ -9,9 +9,9 @@ ORIGIN = 'https://lovemachinesurfboards.com'
 COLLECTION = ORIGIN + '/collections/all-fm'
 LIMIT = 250
 
-def fetch_page(page):
+def fetch_page(page, collection=COLLECTION):
     request = urllib.request.Request(
-        f'{COLLECTION}/products.json?limit={LIMIT}&page={page}',
+        f'{collection}/products.json?limit={LIMIT}&page={page}',
         headers={'Accept': 'application/json', 'User-Agent': 'NudgeList/1.0 inventory monitor'})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.load(response)
@@ -26,7 +26,8 @@ def identity(value):
         raise ValueError('Invalid Shopify identity')
     return str(value)
 
-def normalize(products):
+def normalize(products, origin=ORIGIN, target_sizes=None, require_brand=False):
+    target_sizes = {"6'4", "6'6"} if target_sizes is None else target_sizes
     result = {}
     seen = set()
     for product in products:
@@ -42,6 +43,9 @@ def normalize(products):
         if not isinstance(variants, list) or not variants or len(variants) >= LIMIT:
             raise ValueError('Missing or potentially truncated variants')
         model = bool(re.search(r'(?<!\w)fm(?!\w)', title, re.I))
+        if require_brand:
+            model = model and bool(re.search(r'(?<!\w)love\s*machine(?!\w)',
+                                             title + ' ' + str(product.get('vendor', '')), re.I))
         for variant in variants:
             if not isinstance(variant, dict) or type(variant.get('available')) is not bool:
                 raise ValueError('Missing boolean purchase availability')
@@ -51,7 +55,7 @@ def normalize(products):
                 raise ValueError('Invalid variant description')
             # A size selected by the variant overrides a size in the product title.
             found = sizes(' '.join(t for t in texts if t)) or sizes(title)
-            if not model or len(found) != 1 or not found <= {"6'4", "6'6"}:
+            if not model or len(found) != 1 or not found <= target_sizes:
                 continue
             key = pid + ':' + vid
             if key in result:
@@ -61,10 +65,12 @@ def normalize(products):
                 raise ValueError('Invalid variant price')
             result[key] = {'product_id': pid, 'variant_id': vid, 'title': title,
                            'size': next(iter(found)), 'available': variant['available'],
-                           'price': price, 'url': f'{ORIGIN}/products/{handle}?variant={vid}'}
+                           'price': price, 'url': f'{origin}/products/{handle}?variant={vid}'}
     return dict(sorted(result.items()))
 
-def collect(fetch=fetch_page, state=Path('/state/lovemachine'), now=None):
+def collect(fetch=fetch_page, state=Path('/state/lovemachine'), now=None, *,
+            origin=ORIGIN, target_sizes=None, require_brand=False,
+            report_title='LoveMachine FM inventory'):
     products = []
     for page in range(1, 21):
         payload = fetch(page)
@@ -80,7 +86,7 @@ def collect(fetch=fetch_page, state=Path('/state/lovemachine'), now=None):
         raise ValueError('Collection pagination safety limit reached; preserve baseline')
     if not products:
         raise ValueError('Empty FM collection; preserve baseline')
-    current = normalize(products)
+    current = normalize(products, origin, target_sizes, require_brand)
     state = Path(state)
     path = state / 'latest.json'
     previous = json.loads(path.read_text()) if path.exists() else None
@@ -92,10 +98,10 @@ def collect(fetch=fetch_page, state=Path('/state/lovemachine'), now=None):
             reason = 'new listing' if prior is None else 'restock'
             events.append(f'{reason} | {row["title"]} | size {row["size"]} | price {row["price"] or "unknown"} (store currency) | {row["url"]}')
     revision = previous['revision'] if previous else 0
-    report = previous['report'] if previous else 'LoveMachine FM inventory\nInitial inventory baseline stored. Waiting for new in-stock listings or restocks.\n'
+    report = previous['report'] if previous else report_title + '\nInitial inventory baseline stored. Waiting for new in-stock listings or restocks.\n'
     if events:
         revision += 1
-        report = '\n'.join(['LoveMachine FM inventory', f'Availability event #{revision}', *events]) + '\n'
+        report = '\n'.join([report_title, f'Availability event #{revision}', *events]) + '\n'
     # Keep missing identities and their last stock state. An incomplete but valid
     # page must not turn an available board into a spurious restock on recovery.
     stored = {'captured_at': (now or dt.datetime.now(dt.timezone.utc)).isoformat(),
