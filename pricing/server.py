@@ -59,11 +59,16 @@ def normalize(rows, now):
         raise ValueError('Expected nonempty session array; preserve baseline')
     sessions = {}
     for raw in rows:
-        if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) and raw[k] for k in ('waveClass', 'audience')):
+        if not isinstance(raw, dict) or not isinstance(raw.get('waveClass'), str) or not raw['waveClass']:
+            raise ValueError('Invalid session classification')
+        # Unclassified offerings also appear in the calendar. Only explicitly
+        # public sessions belong in this monitor; do not infer their audience.
+        audience = raw.get('audience')
+        if audience is not None and (not isinstance(audience, str) or not audience):
             raise ValueError('Invalid session classification')
         if raw.get('privateSession') is not None and type(raw['privateSession']) is not bool:
             raise ValueError('Invalid privateSession flag')
-        if raw['waveClass'] != 'reef' or raw['audience'] != 'public' or raw.get('privateSession'):
+        if raw['waveClass'] != 'reef' or audience != 'public' or raw.get('privateSession'):
             continue
         if not all(isinstance(raw.get(k), str) and raw[k] for k in ('_id', 'sessiontype', 'dateid', 'starttime')):
             raise ValueError('Invalid session identity/date/time')

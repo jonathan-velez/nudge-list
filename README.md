@@ -80,6 +80,11 @@ for legacy normalization tests; the active watch uses the helper without jq.
 
 Empty, malformed, wrong-schema, and failed HTTP responses produce watch errors and preserve the previous valid baseline. Partial but otherwise valid responses cannot reliably be recognized as incomplete.
 
+Both DSRT helpers include only sessions explicitly marked `audience=public`.
+Offerings with missing or null audience are excluded because their public status
+is unknown; they do not prevent checks of the remaining public sessions. A
+calendar with no eligible upcoming sessions still fails and preserves its baseline.
+
 ## Dates and normal calendar changes
 
 The internal feed at `http://pricing:8080/report` requests the Pacific current

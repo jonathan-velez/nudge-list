@@ -167,6 +167,27 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), baseline)
         self.assertEqual(self.collect(), self.base)
 
+    def test_unclassified_offerings_excluded_and_empty_public_preserves_baseline(self):
+        path = self.state/'latest.json'
+        for audience in ('missing', None):
+            row = copy.deepcopy(self.rows[0])
+            row.update(_id='air-camp', sessiontype='Air Camp', currentPrice=1)
+            if audience == 'missing':
+                row.pop('audience')
+            else:
+                row['audience'] = audience
+            self.assertEqual(self.collect(self.rows+[row]), self.base)
+            self.assertNotIn('air-camp', json.loads(path.read_text())['sessions'])
+            baseline = path.read_bytes()
+            with self.assertRaises(ValueError):
+                self.collect([row])
+            self.assertEqual(path.read_bytes(), baseline)
+        for audience in ('', False, 123):
+            row = dict(self.rows[0], audience=audience)
+            with self.assertRaises(ValueError):
+                self.collect(self.rows+[row])
+            self.assertEqual(path.read_bytes(), baseline)
+
     def test_conflicting_duplicates_fail(self):
         duplicate = copy.deepcopy(self.rows[0]); duplicate['currentPrice'] = 100
         with self.assertRaises(ValueError):

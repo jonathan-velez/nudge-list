@@ -36,6 +36,17 @@ Source: https://ep.dsrtsurf.com/api/sessions/types
 
 34 definitions with `id`, `name`, `price`, `waveClass`, `waveCode`, `skill`, `skillLevels`, plus optional descriptions, gear, lessons, board types, and locals rates. Repeated IDs/names occur for Bay Beginner Lesson, Critical Carving, Critical Carving & Turns, and Critical Turns. Team Surf templates were priced at 50; Turns to Barrel was 0. These definitions do not establish bookable inventory or public minimum prices.
 
+## Audience omission — 2026-10-21
+
+The October and November `upcoming=true` calendar responses included three
+distinct Air Camp reef sessions (October 30, November 6, and November 13) with
+no `audience` field. One also lacked `incart`. Treating audience as mandatory
+for every returned offering caused both helpers to reject otherwise usable
+public calendars with HTTP 502. The helpers now exclude missing/null audiences
+instead of inferring public status. Invalid audience types and malformed public
+sessions still fail validation, and no eligible upcoming sessions still preserves
+the previous baseline as an error.
+
 ## Implementation references
 
 - [Official Compose example](https://github.com/dgtlmoon/changedetection.io/blob/master/docker-compose.yml)

@@ -99,6 +99,28 @@ class AvailabilityTests(unittest.TestCase):
         with self.assertRaises(ValueError): m.normalize({'a':[]},NOW)
         with self.assertRaises(ValueError): m.normalize({'a':[dict(RAW,available=None)]},NOW)
 
+    def test_unclassified_offerings_excluded_and_failure_preserves_baseline(self):
+        with tempfile.TemporaryDirectory() as folder:
+            state=Path(folder)
+            baseline=m.collect(NOW,lambda month:[RAW],state)
+            path=state/'latest.json'
+            for audience in ('missing',None):
+                row=dict(RAW,_id='air-camp',sessiontype='Air Camp',available=1)
+                row.pop('incart')  # Observed unclassified offerings may lack this too.
+                if audience=='missing': row.pop('audience')
+                else: row['audience']=audience
+                now=NOW+dt.timedelta(days=1)
+                self.assertEqual(m.collect(now,lambda month:[RAW,row],state),baseline)
+                self.assertNotIn('air-camp',json.loads(path.read_text())['sessions'])
+                saved=path.read_bytes()
+                with self.assertRaises(ValueError):
+                    m.collect(now+dt.timedelta(days=1),lambda month:[row],state)
+                self.assertEqual(path.read_bytes(),saved)
+            for audience in ('',False,123):
+                with self.assertRaises(ValueError):
+                    m.collect(now+dt.timedelta(days=1),lambda month:[RAW,dict(RAW,audience=audience)],state)
+                self.assertEqual(path.read_bytes(),saved)
+
     def test_stable_alert_payload_and_daily_snapshots(self):
         with tempfile.TemporaryDirectory() as folder:
             state=Path(folder); rows=[dict(RAW)]

@@ -34,9 +34,14 @@ def normalize(months, now):
     sessions = {}
     for rows in months.values():
         for raw in rows:
-            if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) and raw[k] for k in ('_id','dateid','starttime','sessiontype','audience','waveClass')):
+            if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) and raw[k] for k in ('_id','dateid','starttime','sessiontype','waveClass')):
                 raise ValueError('Invalid session identity/schema')
-            if raw['audience'] != 'public' or raw.get('privateSession'):
+            # Missing/null audience is an unclassified offering, not evidence
+            # that it is public. Exclude it before validating public inventory.
+            audience = raw.get('audience')
+            if audience is not None and (not isinstance(audience, str) or not audience):
+                raise ValueError('Invalid session audience')
+            if audience != 'public' or raw.get('privateSession'):
                 continue
             row = {k: raw.get(k) for k in FIELDS}
             if starts(row) <= now:
